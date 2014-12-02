@@ -47,7 +47,8 @@ class ApicParseResult(namedtuple('ApicParseResult',
         else:
             return self._get_classnode(pathparts, 4)
 
-    def _get_classnode(self, parts, index):
+    @staticmethod
+    def _get_classnode(parts, index):
         if len(parts) <= index:
             return ""
         else:
@@ -58,16 +59,19 @@ class ApicParseResult(namedtuple('ApicParseResult',
         dn = self._sanitize_path(dn)
         return dn[1:].split("/")
 
-    def _remove_format_from_path(self, path, format):
-        return path[:-len("." + format)]
+    @staticmethod
+    def _remove_format_from_path(path, fmt):
+        return path[:-len("." + fmt)]
 
-    def _get_api_format(self, path):
+    @staticmethod
+    def _get_api_format(path):
         if path.endswith(".xml"):
             return 'xml'
         elif path.endswith(".json"):
             return 'json'
 
-    def _get_dn_or_class(self, parts, index):
+    @staticmethod
+    def _get_dn_or_class(parts, index):
         if parts[index] == 'class':
             return parts[-1]
         elif parts[index] == 'mo':
@@ -75,35 +79,38 @@ class ApicParseResult(namedtuple('ApicParseResult',
         else:
             return ""
 
-    def _sanitize_path(self, path):
+    @staticmethod
+    def _sanitize_path(path):
         return path.lstrip("/")
 
+
 def apic_rest_urlparse(url):
-    tuple = urlparse(url)
-    scheme, netloc, path, params, query, fragment = tuple
+    atuple = urlparse(url)
+    scheme, netloc, path, params, query, fragment = atuple
     return ApicParseResult(scheme, netloc, path, params, query, fragment)
+
 
 def convert_dn_to_cobra(dn):
     cobra_dn = Dn.fromString(dn)
     parentMoOrDn = "''"
     dn_dict = OrderedDict()
-    for rn in cobra_dn._Dn__rns:
+    for rn in cobra_dn.rns:
         rn_str = str(rn)
         dn_dict[rn_str] = {}
-        dn_dict[rn_str]['namingVals'] = rn._Rn__namingVals
-        dn_dict[rn_str]['moClassName'] = rn._Rn__meta.moClassName
-        dn_dict[rn_str]['className'] = rn._Rn__meta.className
+        dn_dict[rn_str]['namingVals'] = tuple(rn.namingVals)
+        dn_dict[rn_str]['moClassName'] = rn.meta.moClassName
+        dn_dict[rn_str]['className'] = rn.meta.className
         dn_dict[rn_str]['parentMoOrDn'] = parentMoOrDn
-        parentMoOrDn = rn._Rn__meta.moClassName
+        parentMoOrDn = rn.meta.moClassName
     cobra_str = ""
     for arn in dn_dict.items():
         if len(arn[1]['namingVals']) > 0:
             nvals_str = ", '" + ", ".join(map(str, arn[1]['namingVals'])) + "'"
         else:
             nvals_str = ""
-        cobra_str +=  "    # {0} = {1}({2}{3})\n".format(arn[1]['moClassName'],
-                                                         arn[1]['className'],
-                                                         arn[1]['parentMoOrDn'],
+        cobra_str += "    # {0} = {1}({2}{3})\n".format(arn[1]['moClassName'],
+                                                        arn[1]['className'],
+                                                        arn[1]['parentMoOrDn'],
                                                         nvals_str)
     return cobra_str
 
@@ -111,14 +118,12 @@ def convert_dn_to_cobra(dn):
 def parse_apic_options_string(options):
     # TODO: Need to finish this.
     # cgi FieldStorage/MiniFieldStorage objects in a form container
-    form = cgi.FieldStorage(
-        fp=StringIO(options),
-        #headers=self.headers,
-        environ=dict(REQUEST_METHOD='POST',
-                     CONTENT_TYPE='text/ascii',
-        )
-    )
+    form = cgi.FieldStorage(fp=StringIO(options),
+                            #headers=self.headers,
+                            environ=dict(REQUEST_METHOD='POST',
+                                         CONTENT_TYPE='text/ascii'))
     return form
+
 
 def get_dn_query(dn):
     cobra_str = "    dnQuery = cobra.mit.request.DnQuery('"
@@ -153,6 +158,7 @@ def process_get(url):
             cobra_str += "    # Cobra does not support APIC based node " + \
                          "queries at this time\n"
         else:
+
             cobra_str += ""
             cobra_str += "    # Or direct class query:\n"
             cobra_str += get_class_query(purl.dn_or_class)
@@ -189,6 +195,7 @@ def POST(**kwargs):
     print "POST Payload:\n{0}".format(payload)
     print "SDK:\n\n{0}".format(cobra_str)
 
+
 def EventChannelMessage(**kwargs):
     #print "ignoring EventChannelMessage\n"
     # Ignore all Event Channel Messages
@@ -217,6 +224,7 @@ def start_server(args):
     print
     server.serve_forever()
 
+
 def main():
     parser = ArgumentParser('Archive APIC Rest API calls in the PythonSDK ' +
                             'syntax')
@@ -233,7 +241,7 @@ def main():
                                                'the apicip address.',
                         required=False, default='8.8.8.8')
     parser.add_argument('-po', '--port', help='Local port to listen on,' +
-                                             ' default=8987', default=8987,
+                                              ' default=8987', default=8987,
                         type=int, required=False)
     parser.add_argument('-l', '--location', help='Location that transaction ' +
                                                  'logs are being sent to, ' +
@@ -244,11 +252,13 @@ def main():
                                                     'standard error',
                         action='store_true', default=False, required=False)
     parser.add_argument('-u', '--username', help='Username for APIC account ' +
-        'to be pre-populated in generated code', required=False,
-        default='admin')
+                                                 'to be pre-populated in ' +
+                                                 'generated code',
+                        required=False, default='admin')
     parser.add_argument('-pa', '--password', help='Password for APIC account ' +
-        ' to be pre-populated in generated code', required=False,
-        default='password')
+                                                  'to be pre-populated in ' +
+                                                  'generated code',
+                        required=False, default='password')
     args = parser.parse_args()
 
     start_server(args)
