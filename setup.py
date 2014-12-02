@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 with open('LICENSE.txt') as f:
     license = f.read()
 
-exec(open(os.path.join('arya', 'version.py')).read())
+exec(open(os.path.join('AryaLogger', 'version.py')).read())
 
 
 PKGNAME = 'AryaLogger'
