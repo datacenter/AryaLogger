@@ -6,9 +6,9 @@ from collections import OrderedDict, namedtuple
 from urlparse import urlparse, ResultMixin
 from StringIO import StringIO
 from argparse import ArgumentParser
-from SimpleAciUiLogServer.SimpleAciUiLogServer import SimpleAciUiLogServer
+from SimpleAciUiLogServer import SimpleAciUiLogServer
 from cobra.mit.naming import Dn
-from arya.arya import arya
+from arya import arya
 
 class ApicParseResult(namedtuple('ApicParseResult',
                                  'scheme netloc path params query fragment'),
