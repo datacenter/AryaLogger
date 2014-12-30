@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
 import socket
-import cgi
 from collections import OrderedDict, namedtuple
-from urlparse import urlparse, ResultMixin
+from urlparse import urlparse, ResultMixin, parse_qs
 from StringIO import StringIO
 from argparse import ArgumentParser
-from SimpleAciUiLogServer import SimpleAciUiLogServer
+from SimpleAciUiLogServer.SimpleAciUiLogServer import SimpleAciUiLogServer
 from cobra.mit.naming import Dn
-from arya import arya
+from arya.arya import arya
 
 class ApicParseResult(namedtuple('ApicParseResult',
                                  'scheme netloc path params query fragment'),
@@ -116,24 +115,39 @@ def convert_dn_to_cobra(dn):
 
 
 def parse_apic_options_string(options):
-    # TODO: Need to finish this.
-    # cgi FieldStorage/MiniFieldStorage objects in a form container
-    form = cgi.FieldStorage(fp=StringIO(options),
-                            #headers=self.headers,
-                            environ=dict(REQUEST_METHOD='POST',
-                                         CONTENT_TYPE='text/ascii'))
-    return form
-
+    dictmap = {
+        'rsp-prop-include':     'propInclude',
+        'rsp-subtree-filter':   'subtreePropFilter',
+        'rsp-subtree-class':    'subtreeClassFilter',
+        'rsp-subtree-include':  'subtreeInclude',
+        'query-target':         'queryTarget',
+        'target-subtree-class': 'classFilter',
+        'query-target-filter':  'propFilter',
+        'rsp-subtree':          'subtree',
+        'replica':              'replica',
+        'target-class':         'targetClass',
+    }
+    qstring = ''
+    if options is None or options == '':
+        return qstring
+    for opt, value in parse_qs(options).items():
+        if opt == 'subscription':
+            qstring += '    # Query option "subscription" is not supported by Cobra SDK\n'
+        else:
+            if opt not in dictmap.keys():
+                raise ValueError("Unknown REST query option: {0}: {1}".format(opt, value))
+            qstring += '    query.{0} = "{1}"\n'.format(opt, value[0].replace('"', '\"'))
+    return qstring
 
 def get_dn_query(dn):
-    cobra_str = "    dnQuery = cobra.mit.request.DnQuery('"
+    cobra_str = "    query = cobra.mit.request.DnQuery('"
     cobra_str += str(dn)
     cobra_str += "')"
     return cobra_str
 
 
 def get_class_query(kls):
-    cobra_str = "    classQuery = cobra.mit.request.ClassQuery('"
+    cobra_str = "    query = cobra.mit.request.ClassQuery('"
     cobra_str += str(kls)
     cobra_str += "')"
     return cobra_str
@@ -145,13 +159,15 @@ def process_get(url):
     if 'aaaRefresh.json' in url:
         return
     purl = apic_rest_urlparse(url)
-
+    qstring = parse_apic_options_string(purl.query)
     cobra_str = ""
     if purl.api_method == 'mo':
-        cobra_str += convert_dn_to_cobra(purl.dn_or_class)
-        cobra_str += "    # Or direct dn query:\n"
-        cobra_str += get_dn_query(purl.dn_or_class)
-        cobra_str += "\n"
+        cobra_str2 = convert_dn_to_cobra(purl.dn_or_class)
+        cobra_str2 += "    # Direct dn query:\n"
+        cobra_str2 += get_dn_query(purl.dn_or_class)
+        cobra_str2 += "\n"
+        cobra_str += "SDK:\n\n    # Object instantiation:\n{0}".format(cobra_str2)
+        cobra_str += "{0}\n".format(qstring)
     elif purl.api_method == 'class':
         if purl.classnode != "":
             cobra_str += ""
@@ -159,15 +175,17 @@ def process_get(url):
                          "queries at this time\n"
         else:
 
-            cobra_str += ""
-            cobra_str += "    # Or direct class query:\n"
-            cobra_str += get_class_query(purl.dn_or_class)
-            cobra_str += "\n"
+            cobra_str2 = ""
+            cobra_str2 += "    # Direct class query:\n"
+            cobra_str2 += get_class_query(purl.dn_or_class)
+            cobra_str2 += "\n"
+            cobra_str += "SDK:\n\n{0}".format(cobra_str2)
+            cobra_str += "{0}\n".format(qstring)
     else:
         cobra_str = "\n# api method {0} not supported yet".format(
             purl.api_method)
     print "GET URL: {0}".format(url)
-    print "SDK:\n\n    # Object instantiation:\n{0}".format(cobra_str)
+    print "{0}".format(cobra_str)
 
 
 def undefined(**kwargs):
@@ -266,3 +284,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
