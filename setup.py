@@ -8,7 +8,7 @@ exec(open(os.path.join('AryaLogger', 'version.py')).read())
 
 
 PKGNAME = 'AryaLogger'
-URL = 'https://github.com/datacenter/AryaLogger/' + '/' + PKGNAME
+URL = 'https://github.com/datacenter/' + PKGNAME
 DOWNLOADURL = URL + '/releases/tag/' + str(__version__)
 
 setup(

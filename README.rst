@@ -80,42 +80,28 @@ Or:
 
 There are additional options available that can be seen via the -h option:
 
-    $ aryalogger -h
-    usage: Archive APIC Rest API calls in the PythonSDK syntax [-h] [-a APICIP]
-                                                               [-po PORT]
-                                                               [-l LOCATION]
-                                                               [-s SSLPORT]
-                                                               [-c CERT]
-                                                               [-e [{subscriptionRefresh,aaaRefresh,topInfo} [{subscriptionRefresh,aaaRefresh,topInfo} ...]]]
-                                                               [-r] [-n]
-                                                               [-i INDENT]
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      -a APICIP, --apicip APICIP
-                            If you have a multihomed system, where the apic is on
-                            a private network, the server will print the ip
-                            address your local system has a route to 8.8.8.8. If
-                            you want the server to print a more accurate ip
-                            address for the server you can tell it the apicip
-                            address.
-      -po PORT, --port PORT
-                            Local port to listen on, default=8987
-      -l LOCATION, --location LOCATION
-                            Location that transaction logs are being sent to,
-                            default=/apiinspector
-      -s SSLPORT, --sslport SSLPORT
-                            Local port to listen on for ssl connections,
-                            default=8443
-      -c CERT, --cert CERT  The server certificate file for ssl connections,
-                            default="server.pem"
-      -e [{subscriptionRefresh,aaaRefresh,topInfo} [{subscriptionRefresh,aaaRefresh,topInfo} ...]], --exclude [{subscriptionRefresh,aaaRefresh,topInfo} [{subscriptionRefresh,aaaRefresh,topInfo} ...]]
-                            Exclude certain types of common "noise" queries.
-      -r, --logrequests     Log server requests and response codes to standard
-                            error
-      -n, --nice-output     Pretty print the response and payload
-      -i INDENT, --indent INDENT
-                            The number of spaces to indent when pretty printing
+    * -h: Help
+    * -a/--apicip: The ip address or hostname of an APIC to help resolve which
+      ip address to print when showing the server is started.
+    * -po/--port: The port for the HTTP server to listen on - default is 8987
+    * -l/--location: The URI path to listen for - default is apiinspector
+    * -s/--sslport: The port for the HTTPS server to listen on - default is
+      8443
+    * -c/--cert: The certificate file to use for TLS/SSL negotiation.
+    * -e/--exclude: There are three types of queries the GUI doe constantly
+      to keep the session up or to request information to update the GUI.  This
+      option allows you to selectively exlude these queries from the output.
+      options are: 
+
+      - subscriptionRefresh - Refreshes a subscription request for the GUI.
+      - aaaRefresh - Refreshes the GUI connection to the APIC.
+      - topInfo - Retrieves basic info from the APIC to update the GUI.
+
+    * -r/--logrequests: Log the HTTP request along with the CobraSDK code.
+    * -n/--nice-output: Pretty print any XML or JSON (has no affect currently
+      in AryaLogger)
+    * -i/--indent: The number of spaces to indent when pretty printing (has
+      no affect currently in AryaLogger)
 
 For HTTPS, AryaLogger does come with a default certificate file but it should
 not be used for production.  Instead you should create your own certificate file
