@@ -179,12 +179,11 @@ def parse_apic_options_string(options):
     if options is None or options == '':
         return qstring
     for opt, value in parse_qs(options).items():
-        if opt == 'subscription':
-            qstring += '    # Query option "subscription" is not supported by Cobra SDK\n'
-        else:
-            if opt not in dictmap.keys():
-                raise ValueError("Unknown REST query option: {0}: {1}".format(opt, value))
+        if opt in dictmap.keys():
             qstring += '    query.{0} = "{1}"\n'.format(opt, value[0].replace('"', '\"'))
+        else:
+            qstring += ('    # Query option "{0}" is not'.format(opt) +
+                       ' supported by Cobra SDK\n')
     return qstring
 
 def get_dn_query(dn):
@@ -305,6 +304,8 @@ def start_server(args):
         cert_file.write(server_cert)
         cert_file.close()
         cert = cert_file.name
+        print("\n+++WARNING+++ Using an embedded self-signed certificate for " +
+              "HTTPS, this is not secure.\n")
     else:
         cert = args.cert
 
@@ -333,6 +334,10 @@ def start_server(args):
     print("http://{0}:{1}{2}".format(str(ip), str(args.port), str(args.location)))
     print("https://{0}:{1}{2}".format(str(ip), str(args.sslport), str(args.location)))
     print("")
+    print("Make sure your APIC(s) are configured to send log messages: " +
+          "welcome username -> Start Remote Logging")
+    print("Note: If you connect to your APIC via HTTPS, configure the " +
+          "remote logging to use the https server.")
     serve_forever([http_server, https_server])
 
 def main():
