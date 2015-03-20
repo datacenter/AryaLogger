@@ -134,3 +134,19 @@ Once you have started remote logging to the URL provided by AryaLogger, when you
 click around the APIC GUI you should see auto generated Cobra SDK code from
 AryaLogger.
 
+Problems & Issues
+-----------------
+
+The most common problem seen when running AryaLogger is that the AryaLogger
+server starts, remote logging is setup on the APIC but then no data is seen
+ever being transferred to the server.  This can be caused by many things but
+the most common is a firewall running on the host that the AryaLogger server
+is running on.  We have even seen hosts with multiple firewalls running when
+the end user had no idea.
+
+The simplest form of troubleshooting involves going into the same browser
+tab that the APIC is connected to with and opening the developer tools in
+your browser.  Look at the javascript console and see if any errors are being
+printed about communication to the host the AryaLogger is running on.
+
+If you run into issues please feel free to open an issue on github.
