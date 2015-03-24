@@ -1,10 +1,15 @@
+"""AryaLogger setup.py."""
+
 import os
 from setuptools import setup, find_packages
 
 with open('LICENSE.txt') as f:
-    license = f.read()
+    LICENSE = f.read()
 
-exec(open(os.path.join('AryaLogger', 'version.py')).read())
+__version__ = "1.0.0"
+VERSION = open(os.path.join('AryaLogger', 'version.py')).read()
+# pylint:disable=exec-used
+exec(VERSION)
 
 
 PKGNAME = 'AryaLogger'
@@ -14,13 +19,13 @@ DOWNLOADURL = URL + '/releases/tag/' + str(__version__)
 setup(
     name=PKGNAME,
     version=__version__,
-    description='Use the SimpleAciUiLogServer and arya to convert UI REST ' +
-                'API calls to ACI Python SDK code.',
+    description=('Use the SimpleAciUiLogServer and arya to convert UI REST ' +
+                 'API calls to ACI Python SDK code.'),
     long_description=open('README.rst').read(),
     packages=find_packages(),
     url='https://github.com/datacenter/AryaLogger',
     download_url=DOWNLOADURL,
-    license=license,
+    license=LICENSE,
     author='Mike Timm',
     author_email='mtimm@cisco.com',
     zip_safe=False,

@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""AryaLogger.
+
+A small server based on SimpleAciUiLogServer that can convert APIC GUI logging
+messages to ACI Python SDK (cobra) code.
+
+Depends on SimpleAciUiLogServer, arya and acicobra/acimodel python modules.
+"""
 
 import logging
 import os
@@ -8,13 +15,12 @@ import sys
 import tempfile
 from collections import OrderedDict, namedtuple
 from urlparse import urlparse, ResultMixin, parse_qs
-from StringIO import StringIO
 from argparse import ArgumentParser
 from SimpleAciUiLogServer import ThreadingSimpleAciUiLogServer, serve_forever
 from cobra.mit.naming import Dn
 from arya import arya
 
-server_cert = """
+SERVER_CERT = """
 -----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQC+oA+hYsF3uBIMt7i1ELfUFnyf4/MKM/Ylmy4yBc0/YhqANXYk
 so3+gAGkgRlv9ODdsFS7KvjzyaT0kjgA3ahDPyvtroAOWsdFdHJvtS4Ek1WI1Bee
@@ -60,12 +66,16 @@ TOBaHjC6ZZLRd77dd3s=
 class ApicParseResult(namedtuple('ApicParseResult',
                                  'scheme netloc path params query fragment'),
                       ResultMixin):
-    """
+
+    """ApicParseResult class.
+
     Mixin type of class that adds some apic specific properties to the urlparse
     named tuple
     """
+
     @property
     def dn_or_class(self):
+        """Check if a path is for a dn or class."""
         pathparts = self._get_path_parts()
         if pathparts[1] != 'node':
             return self._get_dn_or_class(pathparts, 1)
@@ -74,10 +84,12 @@ class ApicParseResult(namedtuple('ApicParseResult',
 
     @property
     def api_format(self):
+        """return the api format portion of the URL."""
         return self._get_api_format(self.path)
 
     @property
     def api_method(self):
+        """Return the api method."""
         pathparts = self._get_path_parts()
         if pathparts[1] == 'node':
             return pathparts[2]
@@ -86,6 +98,7 @@ class ApicParseResult(namedtuple('ApicParseResult',
 
     @property
     def classnode(self):
+        """Return the class or an empty string for mo queries."""
         if self.api_method != 'class':
             return ""
         pathparts = self._get_path_parts()
@@ -96,22 +109,26 @@ class ApicParseResult(namedtuple('ApicParseResult',
 
     @staticmethod
     def _get_classnode(parts, index):
+        """Get the class portion of a path."""
         if len(parts) <= index:
             return ""
         else:
-            return "/".join(parts[index-1:-1])
+            return "/".join(parts[index - 1:-1])
 
     def _get_path_parts(self):
-        dn = self._remove_format_from_path(self.path, self.api_format)
-        dn = self._sanitize_path(dn)
-        return dn[1:].split("/")
+        """Return a list of path parts."""
+        dn_str = self._remove_format_from_path(self.path, self.api_format)
+        dn_str = self._sanitize_path(dn_str)
+        return dn_str[1:].split("/")
 
     @staticmethod
     def _remove_format_from_path(path, fmt):
+        """Remove the api format from the path, including the ."""
         return path[:-len("." + fmt)]
 
     @staticmethod
     def _get_api_format(path):
+        """Return either xml or json for the api format."""
         if path.endswith(".xml"):
             return 'xml'
         elif path.endswith(".json"):
@@ -119,40 +136,45 @@ class ApicParseResult(namedtuple('ApicParseResult',
 
     @staticmethod
     def _get_dn_or_class(parts, index):
+        """Return just the dn or the class."""
         if parts[index] == 'class':
             return parts[-1]
         elif parts[index] == 'mo':
-            return "/".join(parts[index+1:])
+            return "/".join(parts[index + 1:])
         else:
             return ""
 
     @staticmethod
     def _sanitize_path(path):
+        """Left strip any / from the path."""
         return path.lstrip("/")
 
 
 def apic_rest_urlparse(url):
+    """Parse the APIC REST API URL."""
     atuple = urlparse(url)
     scheme, netloc, path, params, query, fragment = atuple
     return ApicParseResult(scheme, netloc, path, params, query, fragment)
 
 
-def convert_dn_to_cobra(dn):
-    cobra_dn = Dn.fromString(dn)
-    parentMoOrDn = "''"
+def convert_dn_to_cobra(dn_str):
+    """Convert an ACI distinguished name to ACI Python SDK (cobra) code."""
+    cobra_dn = Dn.fromString(dn_str)
+    parent_mo_or_dn = "''"
     dn_dict = OrderedDict()
-    for rn in cobra_dn.rns:
-        rn_str = str(rn)
+    for rname in cobra_dn.rns:
+        rn_str = str(rname)
         dn_dict[rn_str] = {}
-        dn_dict[rn_str]['namingVals'] = tuple(rn.namingVals)
-        dn_dict[rn_str]['moClassName'] = rn.meta.moClassName
-        dn_dict[rn_str]['className'] = rn.meta.className
-        dn_dict[rn_str]['parentMoOrDn'] = parentMoOrDn
-        parentMoOrDn = rn.meta.moClassName
+        dn_dict[rn_str]['namingVals'] = tuple(rname.namingVals)
+        dn_dict[rn_str]['moClassName'] = rname.meta.moClassName
+        dn_dict[rn_str]['className'] = rname.meta.className
+        dn_dict[rn_str]['parentMoOrDn'] = parent_mo_or_dn
+        parent_mo_or_dn = rname.meta.moClassName
     cobra_str = ""
     for arn in dn_dict.items():
         if len(arn[1]['namingVals']) > 0:
-            nvals_str = ", '" + ", ".join(map(str, arn[1]['namingVals'])) + "'"
+            nvals = [str(val) for val in arn[1]['namingVals']]
+            nvals_str = ", '" + ", ".join(nvals) + "'"
         else:
             nvals_str = ""
         cobra_str += "    # {0} = {1}({2}{3})\n".format(arn[1]['moClassName'],
@@ -163,6 +185,7 @@ def convert_dn_to_cobra(dn):
 
 
 def parse_apic_options_string(options):
+    """Parse the REST API options string."""
     dictmap = {
         'rsp-prop-include':     'propInclude',
         'rsp-subtree-filter':   'subtreePropFilter',
@@ -180,20 +203,24 @@ def parse_apic_options_string(options):
         return qstring
     for opt, value in parse_qs(options).items():
         if opt in dictmap.keys():
-            qstring += '    query.{0} = "{1}"\n'.format(opt, value[0].replace('"', '\"'))
+            val_str = value[0].replace('"', '\"')
+            qstring += '    query.{0} = "{1}"\n'.format(opt, val_str)
         else:
             qstring += ('    # Query option "{0}" is not'.format(opt) +
-                       ' supported by Cobra SDK\n')
+                        ' supported by Cobra SDK\n')
     return qstring
 
-def get_dn_query(dn):
+
+def get_dn_query(dn_str):
+    """Get the dn query string."""
     cobra_str = "    query = cobra.mit.request.DnQuery('"
-    cobra_str += str(dn)
+    cobra_str += str(dn_str)
     cobra_str += "')"
     return cobra_str
 
 
 def get_class_query(kls):
+    """Get the class query string."""
     cobra_str = "    query = cobra.mit.request.ClassQuery('"
     cobra_str += str(kls)
     cobra_str += "')"
@@ -201,6 +228,7 @@ def get_class_query(kls):
 
 
 def process_get(url):
+    """Process a get request log message."""
     if 'subscriptionRefresh.json' in url:
         return
     if 'aaaRefresh.json' in url:
@@ -213,7 +241,8 @@ def process_get(url):
         cobra_str2 += "    # Direct dn query:\n"
         cobra_str2 += get_dn_query(purl.dn_or_class)
         cobra_str2 += "\n"
-        cobra_str += "SDK:\n\n    # Object instantiation:\n{0}".format(cobra_str2)
+        cobra_str += "SDK:\n\n    # Object instantiation:\n"
+        cobra_str += "{0}".format(cobra_str2)
         cobra_str += "{0}\n".format(qstring)
     elif purl.api_method == 'class':
         if purl.classnode != "":
@@ -236,51 +265,49 @@ def process_get(url):
 
 
 def undefined(**kwargs):
+    """Process an undefined logging message."""
     process_get(kwargs['data']['url'])
-    #pass
 
 
-def GET(**kwargs):
+def GET(**kwargs):   # pylint:disable=invalid-name
+    """Process a GET logging message."""
     process_get(kwargs['data']['url'])
-    #pass
 
 
-def POST(**kwargs):
+def POST(**kwargs):  # pylint:disable=invalid-name
+    """Process a POST logging message."""
     url = kwargs['data']['url']
     payload = kwargs['data']['payload']
     purl = apic_rest_urlparse(url)
-    a = arya()
+    arya_inst = arya()
     if purl.api_method != 'mo':
-        logging.debug("Unknown api_method in POST: {0}".format(purl.api_method))
+        logging.debug("Unknown api_method in POST: %s", purl.api_method)
         return
 
-    #cobra_str = convert_dn_to_cobra(purl.dn_or_class)
-    cobra_str = a.getpython(jsonstr=payload)
-    logging_str = "POST URL: {0}\nPOST Payload:\n{1}\nSDK:\n\n{2}".format(url,
-                                                                      payload,
-                                                                      cobra_str)
-    logging.debug(logging_str)
+    cobra_str = arya_inst.getpython(jsonstr=payload)
+    logging_str = "POST URL: %s\nPOST Payload:\n%s\nSDK:\n\n%s"
+    logging.debug(logging_str, url, payload, cobra_str)
 
 
-def EventChannelMessage(**kwargs):
-    #logging.debug("ignoring EventChannelMessage\n")
-    # Ignore all Event Channel Messages
+def EventChannelMessage(**kwargs):  # pylint:disable=C0103,W0613
+    """Process an event channel logging message."""
     pass
 
 
 def start_server(args):
-
+    """Start the server threads."""
     # This is used to store the certificate filename
     cert = ""
 
     # Setup a signal handler to catch control-c and clean up the cert temp file
     # No way to catch sigkill so try not to do that.
     # noinspection PyUnusedLocal
-    def sigint_handler(sig, frame):
+    def sigint_handler(sig, frame):  # pylint:disable=unused-argument
+        """A signal handler for interrupt."""
         if not args.cert:
             try:
                 os.unlink(cert)
-            except OSError:
+            except OSError:  # pylint:disable=pointless-except
                 pass
         print "Exiting..."
         sys.exit(0)
@@ -301,7 +328,7 @@ def start_server(args):
     if not args.cert:
         # Workaround ssl wrap socket not taking a file like object
         cert_file = tempfile.NamedTemporaryFile(delete=False)
-        cert_file.write(server_cert)
+        cert_file.write(SERVER_CERT)
         cert_file.close()
         cert = cert_file.name
         print("\n+++WARNING+++ Using an embedded self-signed certificate for " +
@@ -328,71 +355,71 @@ def start_server(args):
     # easily and quickly interogate the socket to get the source IP address
     # used to connect to this subnet which we can then print out to make for
     # and easy copy/paste in the APIC UI.
-    ip = [(s.connect((args.apicip, 80)), s.getsockname()[0], s.close()) for s
-          in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]
-    print("serving at:")
-    print("http://{0}:{1}{2}".format(str(ip), str(args.port), str(args.location)))
-    print("https://{0}:{1}{2}".format(str(ip), str(args.sslport), str(args.location)))
-    print("")
+    ip_addr = [(s.connect((args.apicip, 80)), s.getsockname()[0], s.close())
+               for s in [socket.socket(socket.AF_INET,
+                                       socket.SOCK_DGRAM)]][0][1]
+    print("serving at:")  # pylint:disable=C0325
+    print("http://{0}:{1}{2}".format(str(ip_addr), str(args.port),
+                                     str(args.location)))
+    print("https://{0}:{1}{2}".format(str(ip_addr), str(args.sslport),
+                                      str(args.location)))
+    print("")  # pylint:disable=C0325
     print("Make sure your APIC(s) are configured to send log messages: " +
           "welcome username -> Start Remote Logging")
     print("Note: If you connect to your APIC via HTTPS, configure the " +
           "remote logging to use the https server.")
     serve_forever([http_server, https_server])
 
+
 def main():
+    """The main function run when AryaLogger is run in standalone mode."""
     parser = ArgumentParser('Archive APIC Rest API calls in the PythonSDK ' +
                             'syntax')
-    parser.add_argument('-a', '--apicip', help='If you have a multihomed ' +
-                                               'system, where the apic is ' +
-                                               'on a private network, the ' +
-                                               'server will print the ' +
-                                               'ip address your local ' +
-                                               'system has a route to ' +
-                                               '8.8.8.8.  If you want the ' +
-                                               'server to print a more ' +
-                                               'accurate ip address for ' +
-                                               'the server you can tell it ' +
-                                               'the apicip address.',
-                        required=False, default='8.8.8.8')
-    parser.add_argument('-po', '--port', help='Local port to listen on,' +
-                                              ' default=8987', default=8987,
-                        type=int, required=False)
-    parser.add_argument('-l', '--location', help='Location that transaction ' +
-                                                 'logs are being sent to, ' +
-                                                 'default=/apiinspector',
-                        default="/apiinspector", required=False)
-    parser.add_argument('-s', '--sslport', help='Local port to listen on ' +
-                                                ' for ssl connections, ' +
-                                                ' default=8443', default=8443,
-                        type=int, required=False)
-    parser.add_argument('-c', '--cert', help='The server certificate file' +
-                                             ' for ssl connections, ' +
-                                             ' default="server.pem"',
-                        type=str, required=False)
+    parser.add_argument('-a', '--apicip', required=False, default='8.8.8.8',
+                        help=('If you have a multihomed system, where the ' +
+                              'apic is on a private network, the server ' +
+                              'will print the ip address your local system ' +
+                              'has a route to 8.8.8.8.  If you want the ' +
+                              'server to print a more accurate ip address ' +
+                              'for theserver you can tell it the apicip ' +
+                              'address.'))
+
+    parser.add_argument('-po', '--port', type=int, required=False,
+                        default=8987,
+                        help='Local port to listen on, default=8987')
+
+    parser.add_argument('-l', '--location', default="/apiinspector",
+                        required=False,
+                        help=('Location that transaction logs are being ' +
+                              'sent to, default=/apiinspector'))
+
+    parser.add_argument('-s', '--sslport', type=int, required=False,
+                        help=('Local port to listen on for ssl connections, ' +
+                              ' default=8443'))
+
+    parser.add_argument('-c', '--cert', type=str, required=False,
+                        help=('The server certificate file for ssl ' +
+                              'connections, default="server.pem"'))
+
     parser.add_argument('-e', '--exclude', action='append', nargs='*',
                         default=[], choices=['subscriptionRefresh',
                                              'aaaRefresh', 'topInfo'],
-                        help='Exclude certain types of common "noise" queries.')
-    parser.add_argument('-r', '--logrequests', help='Log server requests and ' +
-                                                    'response codes to ' +
-                                                    'standard error',
-                        action='store_true', default=False, required=False)
-    parser.add_argument('-n', '--nice-output', help='Pretty print the ' +
-                                                    'response and payload',
-                        action='store_true', default=False, required=False)
-    parser.add_argument('-i', '--indent', help='The number of spaces to ' +
-                                               'indent when pretty ' +
-                                               'printing',
-                        type=int, default=2, required=False)
-    #parser.add_argument('-u', '--username', help='Username for APIC account ' +
-    #                                             'to be pre-populated in ' +
-    #                                             'generated code',
-    #                    required=False, default='admin')
-    #parser.add_argument('-pa', '--password', help='Password for APIC account ' +
-    #                                              'to be pre-populated in ' +
-    #                                              'generated code',
-    #                    required=False, default='password')
+                        help=('Exclude certain types of common "noise" ' +
+                              'queries.'))
+
+    parser.add_argument('-r', '--logrequests', action='store_true',
+                        default=False, required=False,
+                        help=('Log server requests and response codes to ' +
+                              'standard error'))
+
+    parser.add_argument('-n', '--nice-output', action='store_true',
+                        default=False, required=False,
+                        help='Pretty print the response and payload')
+
+    parser.add_argument('-i', '--indent', type=int, default=2, required=False,
+                        help=('The number of spaces to indent when pretty ' +
+                              'printing'))
+
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG,
@@ -407,4 +434,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
