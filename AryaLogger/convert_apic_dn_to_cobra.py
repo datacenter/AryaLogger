@@ -120,11 +120,11 @@ def convert_dn_to_cobra(dn_str):
     for rn_obj in cobra_dn.rns:
         rn_str = str(rn_obj)
         dn_dict[rn_str] = {}
-        dn_dict[rn_str]['namingVals'] = rn.namingVals
-        dn_dict[rn_str]['moClassName'] = rn.meta.moClassName
-        dn_dict[rn_str]['className'] = rn.meta.className
+        dn_dict[rn_str]['namingVals'] = rn_obj.namingVals
+        dn_dict[rn_str]['moClassName'] = rn_obj.meta.moClassName
+        dn_dict[rn_str]['className'] = rn_obj.meta.className
         dn_dict[rn_str]['parentMoOrDn'] = parent_mo_or_dn
-        parent_mo_or_dn = rn.meta.moClassName
+        parent_mo_or_dn = rn_obj.meta.moClassName
     for arn in dn_dict.items():
         if len(list(arn[1]['namingVals'])) > 0:
             nvals = [str(val) for val in arn[1]['namingVals']]
