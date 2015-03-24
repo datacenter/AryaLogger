@@ -72,8 +72,8 @@ class ApicParseResult(namedtuple('ApicParseResult',
         dn = self._remove_format_from_path(self.path, self.api_format)
         return dn[1:].split("/")
 
-    def _remove_format_from_path(self, path, format):
-        return path[:-len("." + format)]
+    def _remove_format_from_path(self, path, fmt):
+        return path[:-len("." + fmt)]
 
     def _get_api_format(self, path):
         if path.endswith(".xml"):
@@ -89,23 +89,23 @@ class ApicParseResult(namedtuple('ApicParseResult',
         else:
             return ""
 
-def apic_rest_urlparse(url):
-    tuple = urlparse(url)
-    scheme, netloc, path, params, query, fragment = tuple
+def apic_rest_urlparse(url_str):
+    tpl = urlparse(url_str)
+    scheme, netloc, path, params, query, fragment = tpl
     return ApicParseResult(scheme, netloc, path, params, query, fragment)
 
 def convert_dn_to_cobra(dn):
     cobra_dn = Dn.fromString(dn)
     parentMoOrDn = "''"
     dn_dict = OrderedDict()
-    for rn in cobra_dn._Dn__rns:
+    for rn in cobra_dn.rns:
         rn_str = str(rn)
         dn_dict[rn_str] = {}
-        dn_dict[rn_str]['namingVals'] = rn._Rn__namingVals
-        dn_dict[rn_str]['moClassName'] = rn._Rn__meta.moClassName
-        dn_dict[rn_str]['className'] = rn._Rn__meta.className
+        dn_dict[rn_str]['namingVals'] = rn.namingVals
+        dn_dict[rn_str]['moClassName'] = rn.meta.moClassName
+        dn_dict[rn_str]['className'] = rn.meta.className
         dn_dict[rn_str]['parentMoOrDn'] = parentMoOrDn
-        parentMoOrDn = rn._Rn__meta.moClassName
+        parentMoOrDn = rn.meta.moClassName
     for arn in dn_dict.items():
         if len(arn[1]['namingVals']) > 0:
             nvals_str = ", '" + ", ".join(map(str, arn[1]['namingVals'])) + "'"
