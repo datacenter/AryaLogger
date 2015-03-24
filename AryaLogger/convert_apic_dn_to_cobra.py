@@ -27,13 +27,16 @@ from cobra.mit.naming import Dn
 class ApicParseResult(namedtuple('ApicParseResult',
                                  'scheme netloc path params query fragment'),
                       ResultMixin):
+
     """ApicParseResult.
 
     Mixin type of class that adds some apic specific properties to the urlparse
     named tuple
     """
+
     @property
     def dn_or_class(self):
+        """Return the dn or the class."""
         pathparts = self._get_path_parts()
         if pathparts[1] != 'node':
             return self._get_dn_or_class(pathparts, 1)
@@ -42,10 +45,12 @@ class ApicParseResult(namedtuple('ApicParseResult',
 
     @property
     def api_format(self):
+        """Return the api format."""
         return self._get_api_format(self.path)
 
     @property
     def api_method(self):
+        """Return the api method."""
         pathparts = self._get_path_parts()
         if pathparts[1] == 'node':
             return pathparts[2]
@@ -54,6 +59,7 @@ class ApicParseResult(namedtuple('ApicParseResult',
 
     @property
     def classnode(self):
+        """Return the class node."""
         if self.api_method != 'class':
             return ""
         pathparts = self._get_path_parts()
@@ -63,25 +69,30 @@ class ApicParseResult(namedtuple('ApicParseResult',
             return self._get_classnode(pathparts, 4)
 
     def _get_classnode(self, parts, index):
+        """Get the class node."""
         if len(parts) <= index:
             return ""
         else:
             return "/".join(parts[index-1:-1])
 
     def _get_path_parts(self):
+        """Break the path up into a list and return it."""
         dn = self._remove_format_from_path(self.path, self.api_format)
         return dn[1:].split("/")
 
     def _remove_format_from_path(self, path, fmt):
+        """Remove the api format from the path."""
         return path[:-len("." + fmt)]
 
     def _get_api_format(self, path):
+        """Get the api format."""
         if path.endswith(".xml"):
             return 'xml'
         elif path.endswith(".json"):
             return 'json'
 
     def _get_dn_or_class(self, parts, index):
+        """Get the dn or the class depending on the type of query."""
         if parts[index] == 'class':
             return parts[-1]
         elif parts[index] == 'mo':
@@ -89,12 +100,16 @@ class ApicParseResult(namedtuple('ApicParseResult',
         else:
             return ""
 
+
 def apic_rest_urlparse(url_str):
+    """Parse an ACI REST API URL."""
     tpl = urlparse(url_str)
     scheme, netloc, path, params, query, fragment = tpl
     return ApicParseResult(scheme, netloc, path, params, query, fragment)
 
+
 def convert_dn_to_cobra(dn):
+    """Convert an ACI distinguished name to ACI Python SDK code."""
     cobra_dn = Dn.fromString(dn)
     parentMoOrDn = "''"
     dn_dict = OrderedDict()
