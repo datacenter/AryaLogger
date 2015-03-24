@@ -120,7 +120,7 @@ def convert_dn_to_cobra(dn_str):
     for rn_obj in cobra_dn.rns:
         rn_str = str(rn_obj)
         dn_dict[rn_str] = {}
-        dn_dict[rn_str]['namingVals'] = rn_obj.namingVals
+        dn_dict[rn_str]['namingVals'] = list(rn_obj.namingVals)
         dn_dict[rn_str]['moClassName'] = rn_obj.meta.moClassName
         dn_dict[rn_str]['className'] = rn_obj.meta.className
         dn_dict[rn_str]['parentMoOrDn'] = parent_mo_or_dn
