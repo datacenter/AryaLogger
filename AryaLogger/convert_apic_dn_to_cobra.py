@@ -19,7 +19,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import re
 from urlparse import urlparse, ResultMixin
 from collections import OrderedDict, namedtuple
 from cobra.mit.naming import Dn
@@ -28,7 +27,8 @@ from cobra.mit.naming import Dn
 class ApicParseResult(namedtuple('ApicParseResult',
                                  'scheme netloc path params query fragment'),
                       ResultMixin):
-    """
+    """ApicParseResult.
+
     Mixin type of class that adds some apic specific properties to the urlparse
     named tuple
     """
