@@ -68,35 +68,39 @@ class ApicParseResult(namedtuple('ApicParseResult',
         else:
             return self._get_classnode(pathparts, 4)
 
-    def _get_classnode(self, parts, index):
+    @staticmethod
+    def _get_classnode(parts, index):
         """Get the class node."""
         if len(parts) <= index:
             return ""
         else:
-            return "/".join(parts[index-1:-1])
+            return "/".join(parts[index - 1:-1])
 
     def _get_path_parts(self):
         """Break the path up into a list and return it."""
-        dn = self._remove_format_from_path(self.path, self.api_format)
-        return dn[1:].split("/")
+        dn_str = self._remove_format_from_path(self.path, self.api_format)
+        return dn_str[1:].split("/")
 
-    def _remove_format_from_path(self, path, fmt):
+    @staticmethod
+    def _remove_format_from_path(path, fmt):
         """Remove the api format from the path."""
         return path[:-len("." + fmt)]
 
-    def _get_api_format(self, path):
+    @staticmethod
+    def _get_api_format(path):
         """Get the api format."""
         if path.endswith(".xml"):
             return 'xml'
         elif path.endswith(".json"):
             return 'json'
 
-    def _get_dn_or_class(self, parts, index):
+    @staticmethod
+    def _get_dn_or_class(parts, index):
         """Get the dn or the class depending on the type of query."""
         if parts[index] == 'class':
             return parts[-1]
         elif parts[index] == 'mo':
-            return "/".join(parts[index+1:])
+            return "/".join(parts[index + 1:])
         else:
             return ""
 
@@ -108,22 +112,23 @@ def apic_rest_urlparse(url_str):
     return ApicParseResult(scheme, netloc, path, params, query, fragment)
 
 
-def convert_dn_to_cobra(dn):
+def convert_dn_to_cobra(dn_str):
     """Convert an ACI distinguished name to ACI Python SDK code."""
-    cobra_dn = Dn.fromString(dn)
-    parentMoOrDn = "''"
+    cobra_dn = Dn.fromString(dn_str)
+    parent_mo_or_dn = "''"
     dn_dict = OrderedDict()
-    for rn in cobra_dn.rns:
-        rn_str = str(rn)
+    for rn_obj in cobra_dn.rns:
+        rn_str = str(rn_obj)
         dn_dict[rn_str] = {}
         dn_dict[rn_str]['namingVals'] = rn.namingVals
         dn_dict[rn_str]['moClassName'] = rn.meta.moClassName
         dn_dict[rn_str]['className'] = rn.meta.className
-        dn_dict[rn_str]['parentMoOrDn'] = parentMoOrDn
-        parentMoOrDn = rn.meta.moClassName
+        dn_dict[rn_str]['parentMoOrDn'] = parent_mo_or_dn
+        parent_mo_or_dn = rn.meta.moClassName
     for arn in dn_dict.items():
-        if len(arn[1]['namingVals']) > 0:
-            nvals_str = ", '" + ", ".join(map(str, arn[1]['namingVals'])) + "'"
+        if len(list(arn[1]['namingVals'])) > 0:
+            nvals = [str(val) for val in arn[1]['namingVals']]
+            nvals_str = ", '" + ", ".join(nvals) + "'"
         else:
             nvals_str = ""
         print "{0} = {1}({2}{3})".format(arn[1]['moClassName'],
@@ -134,17 +139,17 @@ def convert_dn_to_cobra(dn):
 
 if __name__ == '__main__':
     convert_dn_to_cobra('topology/HDfabricOverallHealth5min-0')
-    print
+    print("")
     convert_dn_to_cobra('uni/tn-mgmt/mgmtp-default/oob-default')
-    print
+    print("")
 
-    url = 'https://10.122.254.211/api/node/mo/topology/HDfabricOverallHealt' + \
+    URL = 'https://10.122.254.211/api/node/mo/topology/HDfabricOverallHealt' + \
           'h5min-0.json'
 
-    convert_dn_to_cobra(apic_rest_urlparse(url).dn_or_class)
-    print
+    convert_dn_to_cobra(apic_rest_urlparse(URL).dn_or_class)
+    print("")
 
-    url = 'https://10.122.254.211/api/node/mo/uni/tn-mgmt/mgmtp-default/oob' + \
+    URL = 'https://10.122.254.211/api/node/mo/uni/tn-mgmt/mgmtp-default/oob' + \
           '-default.json'
-    convert_dn_to_cobra(apic_rest_urlparse(url).dn_or_class)
+    convert_dn_to_cobra(apic_rest_urlparse(URL).dn_or_class)
     print
