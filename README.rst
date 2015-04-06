@@ -123,6 +123,10 @@ to:
     http://10.1.1.100:8987/apiinspector
     https://10.1.1.100:8443/apiinspector
 
+If you are going to be using the https address to access the AryaLogger server,
+be sure to browse to the https address printed out by the server when it starts
+so that you can accept the certificate exception.
+
 If you connect to the APIC graphical user interface (GUI) via http, take note of
 the http URL otherwise if you connect to the GUI using https take note of
 the https URL.
@@ -140,9 +144,12 @@ Problems & Issues
 The most common problem seen when running AryaLogger is that the AryaLogger
 server starts, remote logging is setup on the APIC but then no data is seen
 ever being transferred to the server.  This can be caused by many things but
-the most common is a firewall running on the host that the AryaLogger server
-is running on.  We have even seen hosts with multiple firewalls running when
-the end user had no idea.
+the most common is that a security exception has not been accepted for the http
+certificate.  This can be resolved by connecting to the AryaLogger https
+address from your browser and accepting the security exception for the server
+certificate.  The second most common issue is that there is a firewall running
+on the host that the AryaLogger server is running on.  We have even seen hosts
+with multiple firewalls running when the end user had no idea.
 
 The simplest form of troubleshooting involves going into the same browser
 tab that the APIC is connected to with and opening the developer tools in
