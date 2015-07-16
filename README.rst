@@ -12,13 +12,13 @@ Installation of AryaLogger depends on several other modules that are not part
 of the Python standard library.  Here is a basic list of those modules:
 
 1. acicobra - Not yet available on Pypi
-2. arya - Not yet available on Pypi
+2. arya - available on Pypi
 3. SimpleAciUiLogServer - available on Pypi
 
 Installing Dependancies
 +++++++++++++++++++++++
 
-The two difficult dependancies to install are aray and acicobra.
+The difficult dependancy at this point is acicobra as it is not on Pypi yet.
 
 Installing acicobra
 """""""""""""""""""
@@ -27,14 +27,21 @@ If you have at least APIC version 1.0(3f) installed on your APIC, installation
 of acicobra can be done by simply pointing pip at your APIC's cobra/_downloads
 directory using the --find-links option using one of these two commands:
 
-    pip install -Z --find-links http://apic/cobra/_downloads acicobra
+    easy_install -Z --find-links http://apic/cobra/_downloads acicobra
 
 Or:
 
-    pip install -Z --find-links https://apic/cobra/_downloads acicobra
+    easy_install -Z --find-links https://apic/cobra/_downloads acicobra
 
 If your APIC has http disabled (the default), you must either use https or
-enable http on the APIC.
+enable http on the APIC.  Note:  As of the 1.1(1j) version of the APIC,
+TLSv1 has been disabled by default on the APIC for HTTPS.  So if you are
+using HTTPS and your python install uses an older openssl that does not
+support TLSv1_1 or TLSv1_2 you may have issues handshaking with the APIC
+GUI.  This is especially the case on the default installation of python on
+MacOSX which usually utilizes the default installation of openssl which is
+extremely old.  Generally speaking, one should not be using such an old
+version of openssl.  Homebrew may be your best bet.
 
 If you have an older version of software on your APIC, you can either download
 acicobra from the Cisco.com software download site (APIC specific contract
@@ -46,15 +53,9 @@ the acicobra egg from the APIC itself and rename it:
 Installing arya
 """""""""""""""
 
-Arya is currently (as of March 2015) contained in a subdirectory of the ACI
-repo on github.  Installation of arya simply requires you to clone that
-repository, change to the arya directory and run python against arya's setup.py
-with the install option:
+Installing arya from pypi is as simple as using pip:
 
-    cd some/directory/you/want/
-    git clone https://github.com/datacenter/ACI.git
-    cd ACI/arya
-    python setup.py install
+    pip install arya
 
 Installing AryaLogger
 +++++++++++++++++++++
