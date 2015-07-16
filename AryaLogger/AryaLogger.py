@@ -197,6 +197,10 @@ def parse_apic_options_string(options):
         'rsp-subtree':          'subtree',
         'replica':              'replica',
         'target-class':         'targetClass',
+        'page':                 'page',
+        'page-size':            'pageSize',
+        'order-by':             'orderBy',
+        'replica':              'replica',
     }
     qstring = ''
     if options is None or options == '':
@@ -204,7 +208,7 @@ def parse_apic_options_string(options):
     for opt, value in parse_qs(options).items():
         if opt in dictmap.keys():
             val_str = value[0].replace('"', '\"')
-            qstring += '    query.{0} = "{1}"\n'.format(opt, val_str)
+            qstring += '    query.{0} = "{1}"\n'.format(dictmap[opt], val_str)
         else:
             qstring += ('    # Query option "{0}" is not'.format(opt) +
                         ' supported by Cobra SDK\n')
@@ -279,12 +283,12 @@ def POST(**kwargs):  # pylint:disable=invalid-name
     url = kwargs['data']['url']
     payload = kwargs['data']['payload']
     purl = apic_rest_urlparse(url)
-    arya_inst = arya()
+    arya_inst = arya.arya()
     if purl.api_method != 'mo':
         logging.debug("Unknown api_method in POST: %s", purl.api_method)
         return
 
-    cobra_str = arya_inst.getpython(jsonstr=payload)
+    cobra_str = arya_inst.getpython(jsonstr=payload, brief=True)
     logging_str = "POST URL: %s\nPOST Payload:\n%s\nSDK:\n\n%s"
     logging.debug(logging_str, url, payload, cobra_str)
 
