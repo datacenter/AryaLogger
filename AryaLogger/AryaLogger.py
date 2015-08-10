@@ -398,6 +398,7 @@ def main():
                               'sent to, default=/apiinspector'))
 
     parser.add_argument('-s', '--sslport', type=int, required=False,
+                        default=8443,
                         help=('Local port to listen on for ssl connections, ' +
                               ' default=8443'))
 

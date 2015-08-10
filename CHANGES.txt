@@ -1,0 +1,75 @@
+Changes
+=======
+
+v1.1.6
+------
+
+* Fixes
+  - #5 Set the default sslport from argument parsing, without this AryaLogger
+    crashes when executed from the CLI
+* Enhancements
+  - Add CHANGES.txt
+
+v1.1.5
+------
+
+* Fixes
+  - #4 Fixes cobra query strings to be printed properly
+  - Address many pylint and landscape.io identified issues
+  - Fix an issue with naming_vals
+* Enhancements
+  - #4 Adds support for the REST API options page, page-size, order-by and replica
+
+v1.1.4
+------
+
+* Fixes
+  - Simple version bump
+* Enhancements
+  - None
+
+v1.1.3
+------
+
+* Fixes
+  - #2 changed query options logic to be less strict
+* Enhancements
+  - Add additional info to the README about problems & and issues
+  - Add info about using self-signed cert and what to do after starting the
+    server
+
+v1.1.2
+------
+
+* Fixes
+  - None
+* Enhancements
+  - Add a Manifest.in so the LICENSE.txt file is available during install
+
+v1.1.1
+------
+
+* Fixes
+  - Fix README.rst for now, update setup.py and bump the minor version
+* Enhancements
+  - None
+
+v1.1.0
+------
+
+* Fixes
+  - Update setup.py to point to the correct repo
+* Enhancements
+  - Update ArayLogger to the latest features of SimpleAciUiLogServer
+  - Add query string parsing
+  - Pep8 changes and correcting direct access to rn related info
+
+v1.0.0
+------
+
+Original commit to github
+
+* Fixes
+  - None
+* Enhancements
+  - None
