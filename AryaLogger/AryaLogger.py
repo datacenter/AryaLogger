@@ -16,7 +16,9 @@ import tempfile
 from collections import OrderedDict, namedtuple
 from urlparse import urlparse, ResultMixin, parse_qs
 from argparse import ArgumentParser
-from SimpleAciUiLogServer import ThreadingSimpleAciUiLogServer, serve_forever
+from SimpleAciUiLogServer import (SimpleAciUiLogServer,
+                                  ThreadingSimpleAciUiLogServer,
+                                  serve_forever)
 from cobra.mit.naming import Dn
 from arya import arya
 
@@ -231,42 +233,76 @@ def get_class_query(kls):
     return cobra_str
 
 
+def handle_mo(purl, qstring):
+    cobra_str2 = convert_dn_to_cobra(purl.dn_or_class)
+    cobra_str2 += "    # Direct dn query:\n"
+    cobra_str2 += get_dn_query(purl.dn_or_class)
+    cobra_str2 += "\n"
+    cobra_str = "SDK:\n\n    # Object instantiation:\n"
+    cobra_str += "{0}".format(cobra_str2)
+    cobra_str += "{0}\n".format(qstring)
+    return cobra_str
+
+
+def handle_class(purl, qstring):
+    if purl.classnode != "":
+        cobra_str = ""
+        cobra_str += "    # Cobra does not support APIC based node " + \
+                     "queries at this time\n"
+    else:
+        cobra_str2 = ""
+        cobra_str2 += "    # Direct class query:\n"
+        cobra_str2 += get_class_query(purl.dn_or_class)
+        cobra_str2 += "\n"
+        cobra_str = "SDK:\n\n{0}".format(cobra_str2)
+        cobra_str += "{0}\n".format(qstring)
+    return cobra_str
+
+def handle_aaa_login(purl, qstring):
+    # Special case the login, not sure when this would ever be seen though
+    cobra_str = "SDK:\n\n    md.login()"
+    return cobra_str
+
+
+def handle_aaa_logout(purl, qstring):
+    # Special case the logout.
+    cobra_str = "SDK:\n\n    md.logout()"
+    return cobra_str
+
+
 def process_get(url):
     """Process a get request log message."""
-    if 'subscriptionRefresh.json' in url:
-        return
-    if 'aaaRefresh.json' in url:
+    if 'subscriptionRefresh.json' in url or 'aaaRefresh.json' in url:
         return
     purl = apic_rest_urlparse(url)
     qstring = parse_apic_options_string(purl.query)
-    cobra_str = ""
-    if purl.api_method == 'mo':
-        cobra_str2 = convert_dn_to_cobra(purl.dn_or_class)
-        cobra_str2 += "    # Direct dn query:\n"
-        cobra_str2 += get_dn_query(purl.dn_or_class)
-        cobra_str2 += "\n"
-        cobra_str += "SDK:\n\n    # Object instantiation:\n"
-        cobra_str += "{0}".format(cobra_str2)
-        cobra_str += "{0}\n".format(qstring)
-    elif purl.api_method == 'class':
-        if purl.classnode != "":
-            cobra_str += ""
-            cobra_str += "    # Cobra does not support APIC based node " + \
-                         "queries at this time\n"
-        else:
+    supported_api_methods = {
+        'mo': handle_mo,
+        'class': handle_class,
+        'aaaLogin': handle_aaa_login,
+        'aaaLogout': handle_aaa_logout,
+    }
 
-            cobra_str2 = ""
-            cobra_str2 += "    # Direct class query:\n"
-            cobra_str2 += get_class_query(purl.dn_or_class)
-            cobra_str2 += "\n"
-            cobra_str += "SDK:\n\n{0}".format(cobra_str2)
-            cobra_str += "{0}\n".format(qstring)
-    else:
-        cobra_str = "\n# api method {0} not supported yet".format(
+    try:
+        cobra_str = supported_api_methods[purl.api_method](purl, qstring)
+    except KeyError:
+        cobra_str = "\n# api method {0} is not supported yet".format(
             purl.api_method)
+
     logging_str = "GET URL: {0}\n{1}".format(url, cobra_str)
     logging.debug(logging_str)
 
+
+def process_post(url, payload):
+    """Process a post request log message."""
+    purl = apic_rest_urlparse(url)
+    qstring = parse_apic_options_string(purl.query)
+    arya_inst = arya()
+    cobra_str = arya_inst.getpython(jsonstr=payload, brief=True)
+    cobra_str2 = ""
+    for line in cobra_str.split("\n"):
+        cobra_str2 += "    {0}\n".format(line)
+    return cobra_str2
 
 def undefined(**kwargs):
     """Process an undefined logging message."""
@@ -280,17 +316,10 @@ def GET(**kwargs):   # pylint:disable=invalid-name
 
 def POST(**kwargs):  # pylint:disable=invalid-name
     """Process a POST logging message."""
-    url = kwargs['data']['url']
-    payload = kwargs['data']['payload']
-    purl = apic_rest_urlparse(url)
-    arya_inst = arya.arya()
-    if purl.api_method != 'mo':
-        logging.debug("Unknown api_method in POST: %s", purl.api_method)
-        return
-
-    cobra_str = arya_inst.getpython(jsonstr=payload, brief=True)
+    cobra_str = process_post(kwargs['data']['url'], kwargs['data']['payload'])
     logging_str = "POST URL: %s\nPOST Payload:\n%s\nSDK:\n\n%s"
-    logging.debug(logging_str, url, payload, cobra_str)
+    logging.debug(logging_str, kwargs['data']['url'], 
+                  kwargs['data']['payload'], cobra_str)
 
 
 def EventChannelMessage(**kwargs):  # pylint:disable=C0103,W0613
@@ -316,41 +345,66 @@ def start_server(args):
         print "Exiting..."
         sys.exit(0)
 
-    ThreadingSimpleAciUiLogServer.prettyprint = args.nice_output
-    ThreadingSimpleAciUiLogServer.indent = args.indent
+    http_server = None
+    https_server = None
 
-    http_server = ThreadingSimpleAciUiLogServer(("", args.port),
-                                                logRequests=args.logrequests,
+    if args.single_server is not None:
+        SimpleAciUiLogServer.prettyprint = args.nice_output
+        SimpleAciUiLogServer.indent = args.indent
+    else:
+        ThreadingSimpleAciUiLogServer.prettyprint = args.nice_output
+        ThreadingSimpleAciUiLogServer.indent = args.indent
+
+    if args.single_server is None:
+        http_server = ThreadingSimpleAciUiLogServer(("", args.port),
+                                                log_requests=args.logrequests,
                                                 location=args.location,
                                                 excludes=args.exclude)
-    # register our callback functions
-    http_server.register_function(POST)
-    http_server.register_function(GET)
-    http_server.register_function(undefined)
-    http_server.register_function(EventChannelMessage)
+    elif args.single_server == 'http':
+        http_server = SimpleAciUiLogServer(("", args.port),
+                                           log_requests=args.logrequests,
+                                           location=args.location,
+                                           excludes=args.exclude)
+    if http_server:
+        # register our callback functions
+        http_server.register_function(POST)
+        http_server.register_function(GET)
+        http_server.register_function(undefined)
+        http_server.register_function(EventChannelMessage)
 
-    if not args.cert:
+    if not args.cert and (args.single_server is None or
+                          args.single_server == 'https'):
         # Workaround ssl wrap socket not taking a file like object
         cert_file = tempfile.NamedTemporaryFile(delete=False)
         cert_file.write(SERVER_CERT)
         cert_file.close()
         cert = cert_file.name
-        print("\n+++WARNING+++ Using an embedded self-signed certificate for " +
-              "HTTPS, this is not secure.\n")
+        print("\n+++WARNING+++ Using an embedded self-signed certificate " +
+              "for HTTPS, this is not secure.\n")
     else:
         cert = args.cert
 
-    https_server = ThreadingSimpleAciUiLogServer(("", args.sslport),
+    if args.single_server is None:
+        https_server = ThreadingSimpleAciUiLogServer(("", args.sslport),
                                                  cert=cert,
                                                  location=args.location,
-                                                 logRequests=args.logrequests,
-                                                 excludes=args.exclude)
+                                                 log_requests=args.logrequests,
+                                                 excludes=args.exclude,
+                                                 request_types=args.request_type)
+    elif args.single_server == 'https':
+        https_server = SimpleAciUiLogServer(("", args.sslport),
+                                            cert=cert,
+                                            location=args.location,
+                                            log_requests=args.logrequests,
+                                            excludes=args.exclude,
+                                            request_types=args.request_type)
 
-    # register our callback functions
-    https_server.register_function(POST)
-    https_server.register_function(GET)
-    https_server.register_function(undefined)
-    https_server.register_function(EventChannelMessage)
+    if https_server:
+        # register our callback functions
+        https_server.register_function(POST)
+        https_server.register_function(GET)
+        https_server.register_function(undefined)
+        https_server.register_function(EventChannelMessage)
 
     signal.signal(signal.SIGINT, sigint_handler)  # Or whatever signal
 
@@ -363,16 +417,30 @@ def start_server(args):
                for s in [socket.socket(socket.AF_INET,
                                        socket.SOCK_DGRAM)]][0][1]
     print("serving at:")  # pylint:disable=C0325
-    print("http://{0}:{1}{2}".format(str(ip_addr), str(args.port),
-                                     str(args.location)))
-    print("https://{0}:{1}{2}".format(str(ip_addr), str(args.sslport),
-                                      str(args.location)))
+    if http_server:
+        print("http://{0}:{1}{2}".format(str(ip_addr), str(args.port),
+                                         str(args.location)))
+    if https_server:
+        print("https://{0}:{1}{2}".format(str(ip_addr), str(args.sslport),
+                                          str(args.location)))
+
     print("")  # pylint:disable=C0325
     print("Make sure your APIC(s) are configured to send log messages: " +
           "welcome username -> Start Remote Logging")
-    print("Note: If you connect to your APIC via HTTPS, configure the " +
-          "remote logging to use the https server.")
-    serve_forever([http_server, https_server])
+    if args.single_server == 'http':
+        print("Note: If you connect to the APIC GUI via HTTPS, you need to " +
+              "start and use the HTTPS server.")
+    elif args.single_server is None:
+        print("Note: If you connect to your APIC via HTTPS, configure the " +
+              "remote logging to use the https server.")
+    print("")
+
+    if http_server and https_server:
+        serve_forever([http_server, https_server])
+    elif http_server:
+        serve_forever([http_server])
+    elif https_server:
+        serve_forever([https_server])
 
 
 def main():
@@ -388,42 +456,55 @@ def main():
                               'for theserver you can tell it the apicip ' +
                               'address.'))
 
-    parser.add_argument('-po', '--port', type=int, required=False,
-                        default=8987,
-                        help='Local port to listen on, default=8987')
-
-    parser.add_argument('-l', '--location', default="/apiinspector",
-                        required=False,
-                        help=('Location that transaction logs are being ' +
-                              'sent to, default=/apiinspector'))
-
-    parser.add_argument('-s', '--sslport', type=int, required=False,
-                        default=8443,
-                        help=('Local port to listen on for ssl connections, ' +
-                              ' default=8443'))
-
     parser.add_argument('-c', '--cert', type=str, required=False,
                         help=('The server certificate file for ssl ' +
                               'connections, default="server.pem"'))
 
     parser.add_argument('-e', '--exclude', action='append', nargs='*',
                         default=[], choices=['subscriptionRefresh',
-                                             'aaaRefresh', 'topInfo'],
+                                             'aaaRefresh', 'aaaLogout',
+                                             'HDfabricOverallHealth5min-0',
+                                             'topInfo', 'all'],
                         help=('Exclude certain types of common "noise" ' +
                               'queries.'))
 
-    parser.add_argument('-r', '--logrequests', action='store_true',
-                        default=False, required=False,
-                        help=('Log server requests and response codes to ' +
-                              'standard error'))
+    parser.add_argument('-i', '--indent', type=int, default=2, required=False,
+                        help=('The number of spaces to indent when pretty ' +
+                              'printing'))
+
+    parser.add_argument('-l', '--location', default="/apiinspector",
+                        required=False,
+                        help=('Location that transaction logs are being ' +
+                              'sent to, default=/apiinspector'))
 
     parser.add_argument('-n', '--nice-output', action='store_true',
                         default=False, required=False,
                         help='Pretty print the response and payload')
 
-    parser.add_argument('-i', '--indent', type=int, default=2, required=False,
-                        help=('The number of spaces to indent when pretty ' +
-                              'printing'))
+    parser.add_argument('-po', '--port', type=int, required=False,
+                        default=8987,
+                        help='Local port to listen on, default=8987')
+
+    parser.add_argument('-r', '--logrequests', action='store_true',
+                        default=False, required=False,
+                        help=('Log server requests and response codes to ' +
+                              'standard error'))
+ 
+    parser.add_argument('-s', '--sslport', type=int, required=False,
+                        default=8443,
+                        help=('Local port to listen on for ssl connections, ' +
+                              ' default=8443'))
+
+    parser.add_argument('-si', '--single-server', type=str, required=False,
+                        default=None, choices=['http', 'https'],
+                        help=('Only start either the http server or the ' +
+                              'https server, the default is to start both'))
+
+    parser.add_argument('-ty', '--request-type', action='append', nargs='*',
+                        default=[], choices=['POST', 'GET', 'undefined',
+                                             'EventChannelMessage', 'all'],
+                        help=('Only log specific request-types, default is ' +
+                              'log all that are supported.'))
 
     args = parser.parse_args()
 
@@ -433,6 +514,19 @@ def main():
     if args.exclude:
         # Flatten the list
         args.exclude = [val for sublist in args.exclude for val in sublist]
+        if 'all' in args.exclude:
+            args.exclude = ['subscriptionRefresh', 'aaaRefresh', 'aaaLogout',
+                            'HDfabricOverallHealth5min-0', 'topInfo']
+
+    if args.request_type:
+        # Flatten the list
+        args.request_type = [val for sublist in args.request_type for val in 
+                                 sublist]
+        if 'all' in args.request_type:
+            args.request_type = ['POST', 'GET', 'undefined',
+                                 'EventChannelMessage']
+    else:
+        args.request_type = ['POST', 'GET', 'undefined', 'EventChannelMessage']
 
     start_server(args)
 

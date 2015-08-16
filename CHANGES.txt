@@ -1,6 +1,22 @@
 Changes
 =======
 
+v1.1.7
+------
+
+* Fixes
+  - Added version requirements for SimpleAciUiLogServer and arya to setup.py.
+* Enhancements
+  - Generalize some of the logging functions so they can be reused between
+    methods
+  - Add aaaLogout handler
+  - Added support for starting a single server (either http or https) via the
+    -si/--single-server {http,https} CLI option.
+  - Added support for request type filtering via the -ty/--request-type option
+  - Added additional exclude options: HDfabricOverallHealth5min-0, aaaLogout and
+    all.  all will exclude all potentially noisy queries.
+  - Bumped version to 1.1.7
+
 v1.1.6
 ------
 

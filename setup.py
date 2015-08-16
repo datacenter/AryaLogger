@@ -30,9 +30,9 @@ setup(
     author_email='mtimm@cisco.com',
     zip_safe=False,
     install_requires=[
-        'SimpleAciUiLogServer',
+        'SimpleAciUiLogServer>=1.1.3',
         'acicobra',
-        'arya'
+        'arya>=1.1.4'
     ],
     classifiers=(
         'Development Status :: 4 - Beta',
