@@ -202,7 +202,6 @@ def parse_apic_options_string(options):
         'page':                 'page',
         'page-size':            'pageSize',
         'order-by':             'orderBy',
-        'replica':              'replica',
     }
     qstring = ''
     if options is None or options == '':
